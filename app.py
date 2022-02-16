@@ -1,14 +1,32 @@
-from flask import Flask
-from flask import request
-import imageio
+from flask import Flask, render_template, request, url_for, jsonify
+# import imageio
 from skimage.color import rgb2hsv
 import numpy as np
 import cv2 
+from keras.models import load_model
+from PIL import Image
 app = Flask(__name__)
 
 
 @app.route("/")
 def hello():
+    try:
+        model = load_model('E:/User Document/my_model.h5')
+        image = Image.open('E:/User Document/processed/PotassiumHigh/PotassiumHigh44.jpg')
+        image = image.resize((180, 180))
+        print("this")
+        print(image)
+        image = np.array(image)
+        img_tensor = np.expand_dims(image, axis=0) 
+        print(model.predict(img_tensor))
+    except Exception as e:
+        print(e)
+        return e
+    return 'fail'
+    
+
+
+
     im1 = imageio.imread("C:/newfolder/image.jpg")
     leaf_hsv = rgb2hsv(im1)
    
@@ -47,7 +65,6 @@ def hello():
     imageio.imsave("C:/newfolder/image3.jpg", x3)
 
     #imshow(x)
-    return "Hello, Farmers!"
     
     #leaf_masked = np.dstack((red,green,blue))
     #imshow(leaf_masked)
