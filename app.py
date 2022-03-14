@@ -26,18 +26,32 @@ def toBase64(binary_file):
     base64_encoded_data = base64.b64encode(binary_file_data)
     base64_message = base64_encoded_data
     return base64_message
+def crop(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    th, threshed = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11,11))
+    morphed = cv2.morphologyEx(threshed, cv2.MORPH_CLOSE, kernel)
+    cnts = cv2.findContours(morphed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
+    cnt = sorted(cnts, key=cv2.contourArea)[-1]
+    x,y,w,h = cv2.boundingRect(cnt)
+    dst = img[y:y+h, x:x+w]
+    return dst
+
 
 @app.route("/predict" ,methods = ['GET' , 'POST'])
 def hello():
     try:
-        print("request.get_json()")
-        base64Image = request.headers.get('base64') 
+        requestBody =request.data.decode('UTF-8')
+        requestObject = json.loads(requestBody)
+        base64Image = requestObject["base64"]
         base64_img_bytes = base64Image.encode('utf-8')
         with open('decoded_image.png', 'wb') as file_to_save:
             print(file_to_save)
-            decoded_image_data = base64.decodebytes(base64_img_bytes)
-            file_to_save.write(decoded_image_data)  
+            decoded_image_data = base64.decodebytes(base64_img_bytes) 
         image = Image.open(io.BytesIO(decoded_image_data))
+        print(type(image))
+        # image = Image.open(base64Image)
+        image = image.resize((180, 180))
         image_np = np.array(image)
     
         im1 = image_np
@@ -74,6 +88,25 @@ def hello():
         leaf_masked = np.dstack((red,green,blue))
         x3=cv2.fastNlMeansDenoisingColored(leaf_masked,None,10,10,7,21)
         
+       
+        
+        # imageio.imsave("withoutSymptom.jpg", x1)
+        # imageio.imsave("symptom.jpg", x2)
+        # imageio.imsave("leaf.jpg", x3)
+        print(type(x2))
+        model = load_model('my_model.h5')
+        image = Image.fromarray(x2)
+        image = image.resize((180, 180))
+        image = np.array(image)
+        img_tensor = np.expand_dims(image, axis=0)
+        prediction =  model.predict(img_tensor)
+        
+
+        maxClass = max(prediction[0])
+        labelIndex =prediction[0].tolist().index(maxClass)
+        print(prediction)
+
+        # ['NitrogenHigh', 'NitrogenLow', 'PhosphorusHigh', 'PhosphorusLow', 'PotassiumHigh', 'PotassiumLow']  
         black_pixels = np.where(
             (x1[:, :, 0] == 0) & 
             (x1[:, :, 1] == 0) & 
@@ -93,30 +126,13 @@ def hello():
             (x3[:, :, 2] == 0)
             )
         x3[black_pixels] = [255, 255, 255]
-        
-        imageio.imsave("withoutSymptom.jpg", x1)
-        imageio.imsave("symptom.jpg", x2)
-        imageio.imsave("leaf.jpg", x3)
+    
+        b64_string = base64.b64encode(x2)
+        symptom = b64_string.decode('utf-8')
 
-        model = load_model('E:/User Document/my_model.h5')
-        image = Image.open('symptom.jpg')
-        image = image.resize((180, 180))
-        image = np.array(image)
-        img_tensor = np.expand_dims(image, axis=0)
-        prediction =  model.predict(img_tensor)
-        maxClass = max(prediction[0])
-        labelIndex =prediction[0].tolist().index(maxClass)
-
-        # ['NitrogenHigh', 'NitrogenLow', 'PhosphorusHigh', 'PhosphorusLow', 'PotassiumHigh', 'PotassiumLow']  
-
-
-        with open("symptom.jpg", "rb") as img_file:
-            b64_string = base64.b64encode(img_file.read())
-            symptom = b64_string.decode('utf-8')
-
-        with open("leaf.jpg", "rb") as img_file:
-            b64_string = base64.b64encode(img_file.read())
-            leaf = b64_string.decode('utf-8')
+    
+        b64_string = base64.b64encode(x3)
+        leaf = b64_string.decode('utf-8')
 
         response = app.response_class(
         response='succeed',

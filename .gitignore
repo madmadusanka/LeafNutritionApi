@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+venv/Lib/site-packages/pip/_vendor/chardet/__pycache__/escsm.cpython-39.pyc
+*.pyc
+*.pem
