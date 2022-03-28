@@ -71,9 +71,17 @@ def hello():
 
 
         lower_mask = leaf_hsv[:,:,0] > 0.0 
-        upper_mask = leaf_hsv[:,:,0] < 0.18 
+        upper_mask = leaf_hsv[:,:,0] < 0.2 
         saturation_mask = leaf_hsv[:,:,1] > 0
-        mask2 =upper_mask*lower_mask*saturation_mask
+        tipMask =upper_mask*lower_mask*saturation_mask
+
+        lower_mask = leaf_hsv[:,:,0] > 0.2
+        upper_mask = leaf_hsv[:,:,0] < 0.3 
+        saturation_mask = leaf_hsv[:,:,1] > 0
+
+        
+        otherMask =upper_mask*lower_mask*saturation_mask
+        mask2 = tipMask +otherMask  
         red = im1[:,:,0]*mask2
         green = im1[:,:,1]*mask2
         blue = im1[:,:,2]*mask2
@@ -91,12 +99,13 @@ def hello():
        
         
         # imageio.imsave("withoutSymptom.jpg", x1)
-        # imageio.imsave("symptom.jpg", x2)
+        imageio.imsave("symptom.jpg", x2)
         # imageio.imsave("leaf.jpg", x3)
         print(type(x2))
-        model = load_model('my_model.h5')
+        model = load_model('my_model5.h5')
         image = Image.fromarray(x2)
-        image = image.resize((180, 180))
+        print(type(image))
+        image = image.resize(( 180,180))
         image = np.array(image)
         img_tensor = np.expand_dims(image, axis=0)
         prediction =  model.predict(img_tensor)
