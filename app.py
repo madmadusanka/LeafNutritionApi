@@ -51,53 +51,10 @@ def hello():
         image = Image.open(io.BytesIO(decoded_image_data))
         print(type(image))
         # image = Image.open(base64Image)
-        image = image.resize((180, 180))
-        image_np = np.array(image)
-    
-        im1 = image_np
-        leaf_hsv = rgb2hsv(im1)
-  
-        lower_mask = leaf_hsv[:,:,0] > 0.2 
-        upper_mask = leaf_hsv[:,:,0] < 0.5 
-        saturation_mask = leaf_hsv[:,:,1] > 0.4 
-    
-        mask1 = upper_mask*lower_mask*saturation_mask
-        red = im1[:,:,0]*mask1
-        green = im1[:,:,1]*mask1
-        blue = im1[:,:,2]*mask1
-        leaf_masked = np.dstack((red,green,blue))
-        x1=cv2.fastNlMeansDenoisingColored(leaf_masked,None,10,10,7,21)
-        
-
-
-        lower_mask = leaf_hsv[:,:,0] > 0.0 
-        upper_mask = leaf_hsv[:,:,0] < 0.2 
-        saturation_mask = leaf_hsv[:,:,1] > 0
-        tipMask =upper_mask*lower_mask*saturation_mask
-
-        lower_mask = leaf_hsv[:,:,0] > 0.2
-        upper_mask = leaf_hsv[:,:,0] < 0.3 
-        saturation_mask = leaf_hsv[:,:,1] > 0
-
-        
-        otherMask =upper_mask*lower_mask*saturation_mask
-        mask2 = tipMask +otherMask  
-        red = im1[:,:,0]*mask2
-        green = im1[:,:,1]*mask2
-        blue = im1[:,:,2]*mask2
-        leaf_masked = np.dstack((red,green,blue))
-        x2=cv2.fastNlMeansDenoisingColored(leaf_masked,None,10,10,7,21)
-
-
-        mask3 = mask1 + mask2
-        red = im1[:,:,0]*mask3
-        green = im1[:,:,1]*mask3
-        blue = im1[:,:,2]*mask3
-        leaf_masked = np.dstack((red,green,blue))
-        x3=cv2.fastNlMeansDenoisingColored(leaf_masked,None,10,10,7,21)
-        
-       
-        
+        cres = ColorProcess(image)
+        x1 = cres[0]
+        x2 = cres[1]
+        x3 = cres[2]
         # imageio.imsave("withoutSymptom.jpg", x1)
         imageio.imsave("symptom.jpg", x2)
         # imageio.imsave("leaf.jpg", x3)
@@ -156,6 +113,49 @@ def hello():
         print(e)
         return "failed"
     return 'succeed'
+
+
+@app.route("/predictBlock" ,methods = ['GET' , 'POST'])
+def block():
+    try:
+        requestBody =request.data.decode('UTF-8')
+        requestObject = json.loads(requestBody)
+        base64Image = requestObject["base64"]
+        base64_img_bytes = base64Image.encode('utf-8')
+        with open('decoded_image.png', 'wb') as file_to_save:
+            print(file_to_save)
+            decoded_image_data = base64.decodebytes(base64_img_bytes) 
+        image = Image.open(io.BytesIO(decoded_image_data))
+
+        cRes = ColorProcess(image)
+        symptemImg = cRes[1]
+        blockRes = devideToBlock(symptemImg)
+
+        tip = blockRes[0]
+        downO = blockRes[1]
+        down1 = blockRes[2]
+        down2 = blockRes[3]
+
+        modelTip = load_model('tip_model.h5')
+        model0 = load_model('0_model.h5')
+        model1 = load_model('1_model.h5')
+        model2 = load_model('2_model.h5')
+
+     
+        predictionTip =  modelTip.predict(getpredictImage(tip))
+        prediction0 =  model0.predict(getpredictImage(downO))
+        prediction1 =  model1.predict(getpredictImage(down1))
+        prediction2 =  model2.predict(getpredictImage(down2))
+        
+        print(predictionTip)
+        print(prediction0)
+        print(prediction1)
+        print(prediction2)
+
+    except Exception as e:
+        print(e)
+        return "failed"
+    return 'succeed'
     
 
 
@@ -172,4 +172,83 @@ def upload_file():
 
 app.run(host='127.0.0.1', port=8050)
 
+def devideToBlock(img):
 
+    height = img.shape[0]
+    width = img.shape[1]
+    
+    heightCutoff = height // 3
+    tip = img[:heightCutoff, :]
+    down = img[heightCutoff:,:]
+    
+
+    widthCutoff = width//3
+    downO = down[:,:widthCutoff]
+    downORest = down[:,widthCutoff:]
+    down1 = downORest[:,:widthCutoff]
+    down2 = downORest[:,widthCutoff:]
+    return [tip,downO,down1,down2]
+
+def getpredictImage(image):
+    image = Image.fromarray(image)
+    image = image.resize(( 180,180))
+    image = np.array(image)
+    img_tensor = np.expand_dims(image, axis=0)
+    return img_tensor
+
+
+
+
+
+
+def ColorProcess(image):
+    try :
+        image = image.resize((180, 180))
+        image_np = np.array(image)
+    
+        im1 = image_np
+        leaf_hsv = rgb2hsv(im1)
+  
+        lower_mask = leaf_hsv[:,:,0] > 0.2 
+        upper_mask = leaf_hsv[:,:,0] < 0.5 
+        saturation_mask = leaf_hsv[:,:,1] > 0.4 
+    
+        mask1 = upper_mask*lower_mask*saturation_mask
+        red = im1[:,:,0]*mask1
+        green = im1[:,:,1]*mask1
+        blue = im1[:,:,2]*mask1
+        leaf_masked = np.dstack((red,green,blue))
+        x1=cv2.fastNlMeansDenoisingColored(leaf_masked,None,10,10,7,21)
+        
+
+
+        lower_mask = leaf_hsv[:,:,0] > 0.0 
+        upper_mask = leaf_hsv[:,:,0] < 0.2 
+        saturation_mask = leaf_hsv[:,:,1] > 0
+        tipMask =upper_mask*lower_mask*saturation_mask
+
+        lower_mask = leaf_hsv[:,:,0] > 0.2
+        upper_mask = leaf_hsv[:,:,0] < 0.3 
+        saturation_mask = leaf_hsv[:,:,1] > 0
+
+        
+        otherMask =upper_mask*lower_mask*saturation_mask
+        mask2 = tipMask +otherMask  
+        red = im1[:,:,0]*mask2
+        green = im1[:,:,1]*mask2
+        blue = im1[:,:,2]*mask2
+        leaf_masked = np.dstack((red,green,blue))
+        x2=cv2.fastNlMeansDenoisingColored(leaf_masked,None,10,10,7,21)
+
+
+        mask3 = mask1 + mask2
+        red = im1[:,:,0]*mask3
+        green = im1[:,:,1]*mask3
+        blue = im1[:,:,2]*mask3
+        leaf_masked = np.dstack((red,green,blue))
+        x3=cv2.fastNlMeansDenoisingColored(leaf_masked,None,10,10,7,21)  
+
+        return [x1 , x2 , x3]
+
+    except Exception as e:
+        return 0
