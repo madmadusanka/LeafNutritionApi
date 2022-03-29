@@ -39,7 +39,7 @@ def crop(img):
 
 
 @app.route("/predict" ,methods = ['GET' , 'POST'])
-def hello():
+def segment():
     try:
         requestBody =request.data.decode('UTF-8')
         requestObject = json.loads(requestBody)
@@ -129,6 +129,9 @@ def block():
 
         cRes = ColorProcess(image)
         symptemImg = cRes[1]
+        x1 = cRes[0]
+        x2 = cRes[1]
+        x3 = cRes[2]
         blockRes = devideToBlock(symptemImg)
 
         tip = blockRes[0]
@@ -147,14 +150,53 @@ def block():
         prediction1 =  model1.predict(getpredictImage(down1))
         prediction2 =  model2.predict(getpredictImage(down2))
         
-        print(predictionTip)
-        print(prediction0)
-        print(prediction1)
-        print(prediction2)
+        #['NitrogenHigh', 'NitrogenLow', 'PhosphorusHigh', 'PhosphorusLow', 'PotassiumHigh', 'PotassiumLow']
+        print(predictionTip[0])
+        print(prediction0[0])
+        print(prediction1[0])
+        print(prediction2[0])
+        labels = [predictionTip[0].tolist().index(max(predictionTip[0])), prediction0[0].tolist().index(max(prediction0[0])), prediction1[0].tolist().index(max(prediction1[0])), prediction2[0].tolist().index(max(prediction2[0]))]
+        labelIndex = most_frequent(labels)
+        black_pixels = np.where(
+            (x1[:, :, 0] == 0) & 
+            (x1[:, :, 1] == 0) & 
+            (x1[:, :, 2] == 0)
+            )
+        x1[black_pixels] = [255, 255, 255]
+        
+        black_pixels = np.where(
+            (x2[:, :, 0] == 0) & 
+            (x2[:, :, 1] == 0) & 
+            (x2[:, :, 2] == 0)
+            )
+        x2[black_pixels] = [255, 255, 255]
+        
+        black_pixels = np.where(
+            (x3[:, :, 0] == 0) & 
+            (x3[:, :, 2] == 0)
+            )
+        x3[black_pixels] = [255, 255, 255]
+    
+        b64_string = base64.b64encode(x2)
+        symptom = b64_string.decode('utf-8')
+
+    
+        b64_string = base64.b64encode(x3)
+        leaf = b64_string.decode('utf-8')
+
+        response = app.response_class(
+        response='succeed',
+        status=200,
+        mimetype='application/json')
+        response.headers.add('symptom',symptom)
+        response.headers.add('leaf',leaf)
+        response.headers.add('pred',labelIndex)
+        return response
 
     except Exception as e:
         print(e)
         return "failed"
+        
     return 'succeed'
     
 
@@ -198,7 +240,8 @@ def getpredictImage(image):
 
 
 
-
+def most_frequent(List):
+    return max(set(List), key = List.count)
 
 
 def ColorProcess(image):
